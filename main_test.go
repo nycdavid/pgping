@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -14,6 +15,9 @@ type MockConnection struct {
 
 func (mc *MockConnection) Open(driverName, dataSourceName string) (*sql.DB, error) {
 	mc.Opened = true
+	if dataSourceName == "badpgconnstring" {
+		return &sql.DB{}, errors.New("Bad dataSourceName")
+	}
 	return &sql.DB{}, nil
 }
 
@@ -62,4 +66,28 @@ func TestMain_writesToLoggerWhenErroring(t *testing.T) {
 	if ml.buf.String() == "" {
 		t.Error("Expected non-empty log buffer")
 	}
+}
+
+func TestMain_returnsNonZeroWhenSqlOpenErrors(t *testing.T) {
+	var buf bytes.Buffer
+	os.Setenv("PGCONN", "badpgconnstring")
+	ml := &MockLogger{buf: &buf}
+	mc := &MockConnection{}
+	if realMain(mc, ml) == 0 {
+		t.Error("Expected bad connection string to get non-zero code")
+	}
+	os.Unsetenv("PGCONN")
+}
+
+func TestMain_writesToLogWhenSqlOpenErrors(t *testing.T) {
+	var buf bytes.Buffer
+	os.Setenv("PGCONN", "badpgconnstring")
+	ml := &MockLogger{buf: &buf}
+	mc := &MockConnection{}
+	realMain(mc, ml)
+
+	if ml.buf.String() == "" {
+		t.Error("Expected error to be logged")
+	}
+	os.Unsetenv("PGCONN")
 }

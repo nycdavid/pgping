@@ -29,15 +29,6 @@ func (pc *PostgresConnection) Open(driverName, dataSourceName string) (*sql.DB, 
 }
 
 func main() {
-	// pgConnStr := os.Getenv("PGCONN")
-	// if pgConnStr == "" {
-	// }
-	//
-	// db, err := sql.Open("postgres", pgConnStr)
-	// if err != nil {
-	// 	log.Print(err)
-	// 	os.Exit(1)
-	// }
 	// err = db.Ping()
 	// if err != nil {
 	// 	log.Print(err)
@@ -61,7 +52,8 @@ func realMain(c Connection, l Logger) int {
 	}
 	_, err := c.Open("postgres", cs)
 	if err != nil {
-		return 0
+		l.Print(err)
+		return 1
 	}
-	return 1
+	return 0
 }
