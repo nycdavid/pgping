@@ -12,8 +12,17 @@ type Connection interface {
 	Open(string, string) (*sql.DB, error)
 }
 
-type PostgresConnection struct {
+type Logger interface {
+	Print(...interface{})
 }
+
+type SystemLogger struct{}
+
+func (sl *SystemLogger) Print(v ...interface{}) {
+	log.Print(v)
+}
+
+type PostgresConnection struct{}
 
 func (pc *PostgresConnection) Open(driverName, dataSourceName string) (*sql.DB, error) {
 	return sql.Open("postgres", dataSourceName)
@@ -36,13 +45,18 @@ func main() {
 	// }
 	// log.Print("Postgres server READY and accepting connections...")
 	// os.Exit(0)
-	os.Exit(realMain(&PostgresConnection{}))
+	os.Exit(
+		realMain(
+			&PostgresConnection{},
+			&SystemLogger{},
+		),
+	)
 }
 
-func realMain(c Connection) int {
+func realMain(c Connection, l Logger) int {
 	cs := os.Getenv("PGCONN")
 	if cs == "" {
-		log.Print("PGCONN environment variable cannot be blank")
+		l.Print("PGCONN environment variable cannot be blank")
 		return 1
 	}
 	_, err := c.Open("postgres", cs)
