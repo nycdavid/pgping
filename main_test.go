@@ -26,8 +26,14 @@ type MockLogger struct {
 }
 
 func (ml *MockLogger) Print(v ...interface{}) {
-	for _, str := range v {
-		_, err := ml.buf.WriteString(str.(string))
+	var err error
+	for _, i := range v {
+		switch v := i.(type) {
+		case string:
+			_, err = ml.buf.WriteString(v)
+		case error:
+			_, err = ml.buf.WriteString(v.Error())
+		}
 		if err != nil {
 			fmt.Println(err)
 		}
