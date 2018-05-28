@@ -16,6 +16,10 @@ type Logger interface {
 	Print(...interface{})
 }
 
+type DBPinger interface {
+	Ping() error
+}
+
 type SystemLogger struct{}
 
 func (sl *SystemLogger) Print(v ...interface{}) {
@@ -28,6 +32,14 @@ func (pc *PostgresConnection) Open(driverName, dataSourceName string) (*sql.DB, 
 	return sql.Open("postgres", dataSourceName)
 }
 
+type SystemDBPinger struct {
+	db *sql.DB
+}
+
+func (sdbp *SystemDBPinger) Ping() error {
+	return sdbp.db.Ping()
+}
+
 func main() {
 	// err = db.Ping()
 	// if err != nil {
@@ -36,21 +48,23 @@ func main() {
 	// }
 	// log.Print("Postgres server READY and accepting connections...")
 	// os.Exit(0)
+	pc := &PostgresConnection{}
 	os.Exit(
 		realMain(
-			&PostgresConnection{},
+			pc,
 			&SystemLogger{},
+			&DBPing{},
 		),
 	)
 }
 
-func realMain(c Connection, l Logger) int {
+func realMain(c Connection, l Logger, dp DBPinger) int {
 	cs := os.Getenv("PGCONN")
 	if cs == "" {
 		l.Print("PGCONN environment variable cannot be blank")
 		return 1
 	}
-	_, err := c.Open("postgres", cs)
+	con, err := c.Open("postgres", cs)
 	if err != nil {
 		l.Print(err)
 		return 1

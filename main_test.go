@@ -23,6 +23,7 @@ func (mc *MockConnection) Open(driverName, dataSourceName string) (*sql.DB, erro
 
 type MockLogger struct {
 	buf *bytes.Buffer
+	log []string
 }
 
 func (ml *MockLogger) Print(v ...interface{}) {
@@ -38,6 +39,19 @@ func (ml *MockLogger) Print(v ...interface{}) {
 			fmt.Println(err)
 		}
 	}
+}
+
+type MockDBPinger struct {
+	pingInvoked bool
+}
+
+func (mdbp *MockDBPinger) Ping() error {
+	mdbp.pingInvoked = true
+	cs := os.Getenv("PGCONN")
+	if cs == "badpgconnstring" {
+		return errors.New("Bad ping")
+	}
+	return nil
 }
 
 func TestMain_exitNonZeroWithoutEnvVar(t *testing.T) {
@@ -94,6 +108,20 @@ func TestMain_writesToLogWhenSqlOpenErrors(t *testing.T) {
 
 	if ml.buf.String() == "" {
 		t.Error("Expected error to be logged")
+	}
+	os.Unsetenv("PGCONN")
+}
+
+func TestMain_pingsPgConnection(t *testing.T) {
+	var buf bytes.Buffer
+	os.Setenv("PGCONN", "goodpgconnstring")
+	ml := &MockLogger{buf: &buf}
+	mc := &MockConnection{}
+	mdbp := &MockDBPinger{}
+	realMain(mc, ml, mdbp)
+
+	if !mdbp.pingInvoked {
+		t.Error("Expected main to Ping")
 	}
 	os.Unsetenv("PGCONN")
 }
