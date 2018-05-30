@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"log"
 	"os"
 
@@ -14,6 +15,10 @@ type Connection interface {
 
 type Logger interface {
 	Print(...interface{})
+}
+
+type DBHandle interface {
+	Ping() error
 }
 
 type SystemLogger struct{}
@@ -45,15 +50,43 @@ func main() {
 }
 
 func realMain(c Connection, l Logger) int {
-	cs := os.Getenv("PGCONN")
-	if cs == "" {
-		l.Print("PGCONN environment variable cannot be blank")
+	err := checkConnectionStr()
+	if err != nil {
+		l.Print(err.Error())
 		return 1
 	}
-	_, err := c.Open("postgres", cs)
+
+	h, err := openConnection(c)
 	if err != nil {
-		l.Print(err)
+		l.Print(err.Error())
+		return 1
+	}
+
+	err = testLine(h)
+	if err != nil {
+		l.Print(err.Error())
 		return 1
 	}
 	return 0
+}
+
+func testLine(h DBHandle) error {
+	return h.Ping()
+}
+
+func checkConnectionStr() error {
+	cs := os.Getenv("PGCONN")
+	if cs == "" {
+		return errors.New("PGCONN environment variable cannot be blank")
+	}
+	return nil
+}
+
+func openConnection(c Connection) (DBHandle, error) {
+	cs := os.Getenv("PGCONN")
+	h, err := c.Open("postgres", cs)
+	if err != nil {
+		return nil, err
+	}
+	return h, nil
 }

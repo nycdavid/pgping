@@ -101,10 +101,13 @@ func TestMain_writesToLogWhenSqlOpenErrors(t *testing.T) {
 
 func TestMain_pingsPgConnection(t *testing.T) {
 	var buf bytes.Buffer
-	os.Setenv("PGCONN", "goodpgconnstring")
+	os.Setenv("PGCONN", "goodpgconnstring-badping")
 	ml := &MockLogger{buf: &buf}
 	mc := &MockConnection{}
-	realMain(mc, ml)
+
+	if realMain(mc, ml) == 0 {
+		t.Error("Expected bad ping to get non-zero code")
+	}
 
 	os.Unsetenv("PGCONN")
 }
