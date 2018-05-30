@@ -27,40 +27,36 @@ func (sl *SystemLogger) Print(v ...interface{}) {
 	log.Print(v)
 }
 
-type SysSqlDB struct {
-	PingFunc func() error
-}
+type SystemConnection struct{}
 
-func (sysDB *SysSqlDB) Ping() error {
-	return sysDB.PingFunc()
+func (sc *SystemConnection) Open(driverName, dataSourceName string) (SqlDB, error) {
+	return sql.Open(driverName, dataSourceName)
 }
 
 func main() {
-	// err = db.Ping()
-	// if err != nil {
-	// 	log.Print(err)
-	// 	os.Exit(1)
-	// }
-	// log.Print("Postgres server READY and accepting connections...")
-	// os.Exit(0)
 	l := &SystemLogger{}
-	os.Exit(
-		realMain(l),
-	)
+	c := &SystemConnection{}
+	os.Exit(realMain(l, c))
 }
 
-func realMain(l Logger) int {
-	_, err := openConnection(l)
+func realMain(l Logger, c Connection) int {
+	db, err := openConnection(c)
 	if err != nil {
+		l.Print(err.Error())
+		return 1
+	}
+	err = db.Ping()
+	if err != nil {
+		l.Print(err.Error())
 		return 1
 	}
 	return 0
 }
 
-func openConnection(l Logger) (SqlDB, error) {
+func openConnection(c Connection) (SqlDB, error) {
 	addr := os.Getenv("PGCONN")
 	if addr == "" {
 		return nil, errors.New("PGCONN is empty")
 	}
-	return sql.Open("postgres", addr)
+	return c.Open("postgres", addr)
 }
