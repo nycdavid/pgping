@@ -41,19 +41,6 @@ func (ml *MockLogger) Print(v ...interface{}) {
 	}
 }
 
-type MockDBPinger struct {
-	pingInvoked bool
-}
-
-func (mdbp *MockDBPinger) Ping() error {
-	mdbp.pingInvoked = true
-	cs := os.Getenv("PGCONN")
-	if cs == "badpgconnstring" {
-		return errors.New("Bad ping")
-	}
-	return nil
-}
-
 func TestMain_exitNonZeroWithoutEnvVar(t *testing.T) {
 	var buf bytes.Buffer
 	expected := 1
@@ -117,11 +104,7 @@ func TestMain_pingsPgConnection(t *testing.T) {
 	os.Setenv("PGCONN", "goodpgconnstring")
 	ml := &MockLogger{buf: &buf}
 	mc := &MockConnection{}
-	mdbp := &MockDBPinger{}
-	realMain(mc, ml, mdbp)
+	realMain(mc, ml)
 
-	if !mdbp.pingInvoked {
-		t.Error("Expected main to Ping")
-	}
 	os.Unsetenv("PGCONN")
 }
