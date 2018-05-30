@@ -2,14 +2,19 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"log"
 	"os"
 
 	_ "github.com/lib/pq"
 )
 
+type SqlDB interface {
+	Ping() error
+}
+
 type Connection interface {
-	Open(string, string) (*sql.DB, error)
+	Open(string, string) (SqlDB, error)
 }
 
 type Logger interface {
@@ -22,10 +27,12 @@ func (sl *SystemLogger) Print(v ...interface{}) {
 	log.Print(v)
 }
 
-type PostgresConnection struct{}
+type SysSqlDB struct {
+	PingFunc func() error
+}
 
-func (pc *PostgresConnection) Open(driverName, dataSourceName string) (*sql.DB, error) {
-	return sql.Open("postgres", dataSourceName)
+func (sysDB *SysSqlDB) Ping() error {
+	return sysDB.PingFunc()
 }
 
 func main() {
@@ -36,24 +43,24 @@ func main() {
 	// }
 	// log.Print("Postgres server READY and accepting connections...")
 	// os.Exit(0)
+	l := &SystemLogger{}
 	os.Exit(
-		realMain(
-			&PostgresConnection{},
-			&SystemLogger{},
-		),
+		realMain(l),
 	)
 }
 
-func realMain(c Connection, l Logger) int {
-	cs := os.Getenv("PGCONN")
-	if cs == "" {
-		l.Print("PGCONN environment variable cannot be blank")
-		return 1
-	}
-	_, err := c.Open("postgres", cs)
+func realMain(l Logger) int {
+	_, err := openConnection(l)
 	if err != nil {
-		l.Print(err)
 		return 1
 	}
 	return 0
+}
+
+func openConnection(l Logger) (SqlDB, error) {
+	addr := os.Getenv("PGCONN")
+	if addr == "" {
+		return nil, errors.New("PGCONN is empty")
+	}
+	return sql.Open("postgres", addr)
 }
