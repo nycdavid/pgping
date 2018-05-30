@@ -27,10 +27,17 @@ func (sl *SystemLogger) Print(v ...interface{}) {
 	log.Print(v)
 }
 
-type PostgresConnection struct{}
+type PostgresConnection struct {
+	h DBHandle
+}
 
 func (pc *PostgresConnection) Open(driverName, dataSourceName string) (*sql.DB, error) {
-	return sql.Open("postgres", dataSourceName)
+	c, err := sql.Open("postgres", dataSourceName)
+	if err != nil {
+		return nil, err
+	}
+	pc.h = c
+	return c, nil
 }
 
 func main() {

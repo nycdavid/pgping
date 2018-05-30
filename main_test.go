@@ -11,12 +11,13 @@ import (
 
 type MockConnection struct {
 	Opened bool
+	h      DBHandle
 }
 
 func (mc *MockConnection) Open(driverName, dataSourceName string) (*sql.DB, error) {
 	mc.Opened = true
 	if dataSourceName == "badpgconnstring" {
-		return &sql.DB{}, errors.New("Bad dataSourceName")
+		return nil, errors.New("Bad dataSourceName")
 	}
 	return &sql.DB{}, nil
 }
@@ -41,6 +42,12 @@ func (ml *MockLogger) Print(v ...interface{}) {
 	}
 }
 
+type MockDBHandle struct{}
+
+func (mdbh *MockDBHandle) Ping() error {
+	return nil
+}
+
 func TestMain_exitNonZeroWithoutEnvVar(t *testing.T) {
 	var buf bytes.Buffer
 	expected := 1
@@ -56,7 +63,8 @@ func TestMain_opensAPostgresConnection(t *testing.T) {
 	var buf bytes.Buffer
 	os.Setenv("PGCONN", "foo")
 	mc := &MockConnection{}
-	realMain(mc, &MockLogger{buf: &buf})
+	ml := &MockLogger{buf: &buf}
+	realMain(mc, ml)
 
 	if !mc.Opened {
 		t.Error("Expected main to open a Postgres connection")
