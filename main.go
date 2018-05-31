@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -22,6 +23,10 @@ type Logger interface {
 	Print(...interface{})
 }
 
+type Delayer interface {
+	Delay()
+}
+
 type SystemLogger struct{}
 
 func (sl *SystemLogger) Print(v ...interface{}) {
@@ -34,13 +39,20 @@ func (sc *SystemConnection) Open(driverName, dataSourceName string) (SqlDB, erro
 	return sql.Open(driverName, dataSourceName)
 }
 
+type SystemDelayer struct{}
+
+func (sd *SystemDelayer) Delay() {
+	time.Sleep(2 * time.Second)
+}
+
 func main() {
 	l := &SystemLogger{}
 	c := &SystemConnection{}
-	os.Exit(realMain(l, c))
+	d := &SystemDelayer{}
+	os.Exit(realMain(l, c, d))
 }
 
-func realMain(l Logger, c Connection) int {
+func realMain(l Logger, c Connection, dly Delayer) int {
 	db, err := openConnection(c)
 	if err != nil {
 		l.Print(err.Error())
@@ -57,6 +69,7 @@ func realMain(l Logger, c Connection) int {
 	for i < limit-1 && err != nil {
 		err = db.Ping()
 		i++
+		dly.Delay()
 	}
 
 	if err != nil {
