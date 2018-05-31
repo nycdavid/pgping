@@ -85,6 +85,9 @@ func TestMain_successfullyPingsTheDatabase(t *testing.T) {
 	if status != 0 {
 		t.Error("Expected a zero status code")
 	}
+	if buf.String() == "" {
+		t.Error("Expected success log")
+	}
 	os.Unsetenv("PGCONN")
 }
 

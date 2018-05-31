@@ -50,6 +50,7 @@ func realMain(l Logger, c Connection) int {
 		l.Print(err.Error())
 		return 1
 	}
+	l.Print("Postgres server READY and accepting connections...")
 	return 0
 }
 
