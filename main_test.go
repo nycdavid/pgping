@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 )
 
@@ -29,6 +30,7 @@ func (ml *MockLogger) Print(v ...interface{}) {
 
 type MockSqlDB struct {
 	PingFunc func() error
+	Pinged   int
 }
 
 func (m *MockSqlDB) Ping() error {
@@ -44,6 +46,7 @@ func (m *MockConnection) Open(driverName, dataSourceName string) (SqlDB, error) 
 }
 
 func TestMain_exitNonZeroWithoutEnvVar(t *testing.T) {
+	os.Setenv("PINGLIMIT", "1")
 	var buf bytes.Buffer
 	expected := 1
 	db := &MockSqlDB{
@@ -68,6 +71,7 @@ func TestMain_exitNonZeroWithoutEnvVar(t *testing.T) {
 }
 
 func TestMain_successfullyPingsTheDatabase(t *testing.T) {
+	os.Setenv("PINGLIMIT", "1")
 	os.Setenv("PGCONN", "goodconnstring")
 	var buf bytes.Buffer
 	db := &MockSqlDB{
@@ -92,6 +96,7 @@ func TestMain_successfullyPingsTheDatabase(t *testing.T) {
 }
 
 func TestMain_unsuccessfullyPingsTheDatabase(t *testing.T) {
+	os.Setenv("PINGLIMIT", "1")
 	os.Setenv("PGCONN", "badconnstring")
 	var buf bytes.Buffer
 	db := &MockSqlDB{
@@ -113,6 +118,7 @@ func TestMain_unsuccessfullyPingsTheDatabase(t *testing.T) {
 }
 
 func TestMain_writesToLoggerWhenErroring(t *testing.T) {
+	os.Setenv("PINGLIMIT", "1")
 	var buf bytes.Buffer
 	ml := &MockLogger{buf: &buf}
 	mc := &MockConnection{}
@@ -124,6 +130,7 @@ func TestMain_writesToLoggerWhenErroring(t *testing.T) {
 }
 
 func TestMain_returnsNonZeroWhenSqlOpenErrors(t *testing.T) {
+	os.Setenv("PINGLIMIT", "1")
 	var buf bytes.Buffer
 	os.Setenv("PGCONN", "pgconnstring")
 	ml := &MockLogger{buf: &buf}
@@ -137,6 +144,32 @@ func TestMain_returnsNonZeroWhenSqlOpenErrors(t *testing.T) {
 	}
 	if ml.buf.String() == "" {
 		t.Error("Expected error to be logged")
+	}
+	os.Unsetenv("PGCONN")
+}
+
+func TestMain_repeatedlyPingsUpToLimit(t *testing.T) {
+	pingLmt := "5"
+	os.Setenv("PINGLIMIT", pingLmt)
+	var buf bytes.Buffer
+	os.Setenv("PGCONN", "pgconnstring")
+	ml := &MockLogger{buf: &buf}
+	db := &MockSqlDB{}
+	db.PingFunc = func() error {
+		db.Pinged++
+		return errors.New("Keep pinging")
+	}
+	mc := &MockConnection{
+		OpenFunc: func() (SqlDB, error) {
+			return db, nil
+		},
+	}
+
+	realMain(ml, mc)
+
+	if pingLmt != strconv.Itoa(db.Pinged) {
+		msg := fmt.Sprintf("Expected db.Pinged to be %s, got %d", pingLmt, db.Pinged)
+		t.Error(msg)
 	}
 	os.Unsetenv("PGCONN")
 }

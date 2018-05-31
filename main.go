@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"strconv"
 
 	_ "github.com/lib/pq"
 )
@@ -45,7 +46,19 @@ func realMain(l Logger, c Connection) int {
 		l.Print(err.Error())
 		return 1
 	}
+
+	limit, err := strconv.Atoi(os.Getenv("PINGLIMIT"))
+	if err != nil {
+		limit = 1
+	}
+
+	i := 0
 	err = db.Ping()
+	for i < limit-1 && err != nil {
+		err = db.Ping()
+		i++
+	}
+
 	if err != nil {
 		l.Print(err.Error())
 		return 1
