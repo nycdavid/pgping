@@ -45,6 +45,15 @@ func (m *MockConnection) Open(driverName, dataSourceName string) (SqlDB, error) 
 	return m.OpenFunc()
 }
 
+type MockDelayer struct {
+	i         int
+	DelayFunc func()
+}
+
+func (m *MockDelayer) Delay() {
+	m.DelayFunc()
+}
+
 func TestMain_exitNonZeroWithoutEnvVar(t *testing.T) {
 	os.Setenv("PINGLIMIT", "1")
 	var buf bytes.Buffer
@@ -59,7 +68,11 @@ func TestMain_exitNonZeroWithoutEnvVar(t *testing.T) {
 			return db, nil
 		},
 	}
-	got := realMain(&MockLogger{buf: &buf}, c)
+	dly := &MockDelayer{}
+	dly.DelayFunc = func() {
+		dly.i++
+	}
+	got := realMain(&MockLogger{buf: &buf}, c, dly)
 
 	if expected != got {
 		msg := fmt.Sprintf("Expected exit code %d, got %d.", expected, got)
@@ -84,7 +97,11 @@ func TestMain_successfullyPingsTheDatabase(t *testing.T) {
 			return db, nil
 		},
 	}
-	status := realMain(&MockLogger{buf: &buf}, c)
+	dly := &MockDelayer{}
+	dly.DelayFunc = func() {
+		dly.i++
+	}
+	status := realMain(&MockLogger{buf: &buf}, c, dly)
 
 	if status != 0 {
 		t.Error("Expected a zero status code")
@@ -109,7 +126,11 @@ func TestMain_unsuccessfullyPingsTheDatabase(t *testing.T) {
 			return db, nil
 		},
 	}
-	status := realMain(&MockLogger{buf: &buf}, c)
+	dly := &MockDelayer{}
+	dly.DelayFunc = func() {
+		dly.i++
+	}
+	status := realMain(&MockLogger{buf: &buf}, c, dly)
 
 	if status != 1 {
 		t.Error("Expected a non-zero status code")
@@ -122,7 +143,11 @@ func TestMain_writesToLoggerWhenErroring(t *testing.T) {
 	var buf bytes.Buffer
 	ml := &MockLogger{buf: &buf}
 	mc := &MockConnection{}
-	realMain(ml, mc)
+	dly := &MockDelayer{}
+	dly.DelayFunc = func() {
+		dly.i++
+	}
+	realMain(ml, mc, dly)
 
 	if ml.buf.String() == "" {
 		t.Error("Expected non-empty log buffer")
@@ -139,7 +164,11 @@ func TestMain_returnsNonZeroWhenSqlOpenErrors(t *testing.T) {
 			return nil, errors.New("Error")
 		},
 	}
-	if realMain(ml, mc) == 0 {
+	dly := &MockDelayer{}
+	dly.DelayFunc = func() {
+		dly.i++
+	}
+	if realMain(ml, mc, dly) == 0 {
 		t.Error("Expected bad connection string to get non-zero code")
 	}
 	if ml.buf.String() == "" {
@@ -155,6 +184,7 @@ func TestMain_repeatedlyPingsUpToLimit(t *testing.T) {
 	os.Setenv("PGCONN", "pgconnstring")
 	ml := &MockLogger{buf: &buf}
 	db := &MockSqlDB{}
+
 	db.PingFunc = func() error {
 		db.Pinged++
 		return errors.New("Keep pinging")
@@ -164,11 +194,19 @@ func TestMain_repeatedlyPingsUpToLimit(t *testing.T) {
 			return db, nil
 		},
 	}
+	dly := &MockDelayer{}
+	dly.DelayFunc = func() {
+		dly.i++
+	}
 
-	realMain(ml, mc)
+	realMain(ml, mc, dly)
 
 	if pingLmt != strconv.Itoa(db.Pinged) {
 		msg := fmt.Sprintf("Expected db.Pinged to be %s, got %d", pingLmt, db.Pinged)
+		t.Error(msg)
+	}
+	if dly.i == 0 {
+		msg := fmt.Sprintf("Expected DelayFunc to be called > 0 times, got %d", dly.i)
 		t.Error(msg)
 	}
 	os.Unsetenv("PGCONN")
